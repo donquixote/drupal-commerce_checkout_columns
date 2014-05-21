@@ -1,0 +1,6 @@
+name = Commerce checkout columns
+description = Two- or Three-column layout for the checkout page.
+core = 7.x
+
+dependencies[] = commerce_checkout
+dependencies[] = commerce_cart

@@ -1,0 +1,214 @@
+<?php
+
+/**
+ * Implements hook_theme()
+ */
+function commerce_checkout_columns_theme() {
+  return array(
+    'commerce_checkout_columns' => array('render element' => 'element'),
+    'commerce_checkout_column' => array('render element' => 'element'),
+  );
+}
+
+/**
+ * Default theme callback for theme('commerce_checkout_columns').
+ *
+ * @param array $vars
+ * @return string
+ *   Rendered html
+ */
+function theme_commerce_checkout_columns($vars) {
+  drupal_add_css(drupal_get_path('module', 'commerce_checkout_columns') . '/css/commerce_checkout_columns.css');
+  $element = $vars['element'];
+  $html = $element['#children'];
+  $n = $element['#commerce_checkout_columns_count'];
+  $class = 'commerce-checkout-columns clearfix commerce-checkout-columns-' . $n;
+  return '<div class="' . $class . '">' . $html . '</div>';
+}
+
+/**
+ * Default theme callback for theme('commerce_checkout_columns').
+ *
+ * @param array $vars
+ * @return string
+ *   Rendered html
+ */
+function theme_commerce_checkout_column($vars) {
+  $element = $vars['element'];
+  $html = $element['#children'];
+  return '<div class="commerce-checkout-column">' . $html . '</div>';
+}
+
+/**
+ * Implements hook_commerce_checkout_pane_info().
+ *
+ * This is used to columnize the checkout panes.
+ */
+function commerce_checkout_columns_commerce_checkout_pane_info() {
+  $checkout_panes = array();
+
+  $checkout_panes['commerce_checkout_columns_separator_0'] = array(
+    'title' => 'Columns separator 0',
+    'base' => 'commerce_checkout_separator',
+    'page' => 'disabled',
+  );
+
+  $checkout_panes['commerce_checkout_columns_separator_1'] = array(
+    'title' => 'Columns separator 1',
+    'base' => 'commerce_checkout_separator',
+    'page' => 'disabled',
+  );
+
+  return $checkout_panes;
+}
+
+/**
+ * Checkout pane callback: returns the separator contents View for inclusion in
+ *   the checkout form.
+ */
+function commerce_checkout_separator_checkout_form($form, &$form_state, $checkout_pane, $order) {
+  return array(
+    '#type' => 'commerce_checkout_separator',
+  );
+}
+
+/**
+ * Checkout review callback.
+ *
+ * @param array $form
+ * @param array $form_state
+ * @param array $checkout_pane
+ * @param stdClass $order
+ *
+ * @return array
+ */
+function commerce_checkout_separator_review($form, $form_state, $checkout_pane, $order) {
+  return array(
+    '#type' => 'commerce_checkout_separator',
+  );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter()
+ */
+function commerce_checkout_columns_form_commerce_checkout_form_checkout_alter(&$form) {
+  foreach (element_children($form) as $key) {
+    if ($form[$key]['#type'] === 'commerce_checkout_separator') {
+      $form['#pre_render'][] = '_commerce_checkout_columns_process';
+      return;
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter()
+ */
+function commerce_checkout_columns_form_commerce_checkout_form_review_alter(&$form) {
+  if (!isset($form['checkout_review']['review']['#data'])) {
+    return;
+  }
+  $columns = array();
+  $column = array();
+  foreach ($form['checkout_review']['review']['#data'] as $key => $item) {
+    if (isset ($item['data']['#type'])
+      && $item['data']['#type'] === 'commerce_checkout_separator'
+    ) {
+      $columns[] = $column;
+      $column = array();
+    }
+    else {
+      $column[$key] = $item;
+    }
+  }
+  if (!empty($column)) {
+    $columns[] = $column;
+  }
+  if (1 === count($columns)) {
+    return;
+  }
+
+  unset($form['checkout_review']['review']);
+  $form['checkout_review']['columns'] = array(
+    '#theme_wrappers' => array('commerce_checkout_columns'),
+    '#commerce_checkout_columns_count' => count($columns),
+  );
+
+  foreach ($columns as $column) {
+    $column_element = array(
+      '#theme_wrappers' => array('commerce_checkout_column'),
+    );
+    foreach ($column as $key => $item) {
+      if (is_array($item['data'])) {
+        $column_element[] = array(
+          '#theme' => 'commerce_checkout_review',
+          '#data' => array($key => $item),
+        );
+      }
+      else {
+        $column_element[] = array(
+          '#type' => 'fieldset',
+          '#title' => $item['title'],
+          'content' => array(
+            '#type' => 'markup',
+            '#markup' => $item['data'],
+          )
+        );
+      }
+    }
+    $form['checkout_review']['columns'][] = $column_element;
+  }
+}
+
+/**
+ * ['#process'] callback for checkout forms with multiple columns.
+ *
+ * @param array $form
+ *   The unmodified form
+ *
+ * @return array
+ *   The modified form
+ *
+ * @throws \Exception
+ */
+function _commerce_checkout_columns_process($form) {
+
+  // Find out how many columns
+  $columns = array();
+  $column = array();
+  foreach (element_children($form) as $key) {
+    if ($form[$key]['#type'] === 'commerce_checkout_separator') {
+      $columns[] = $column;
+      unset($form[$key]);
+      $column = array();
+    }
+    else {
+      $column[] = $key;
+    }
+  }
+  $columns[] = $column;
+
+  if (count($columns) < 2) {
+    return $form;
+  }
+
+  if (count($columns) > 3) {
+    throw new \Exception("More than 3 columns are not supported.");
+  }
+
+  // Distribute fields on columns.
+  $form['columns'] = array(
+    '#theme_wrappers' => array('commerce_checkout_columns'),
+    '#commerce_checkout_columns_count' => count($columns),
+  );
+  foreach ($columns as $i_column => $column) {
+    $form['columns'][$i_column] = array(
+      '#theme_wrappers' => array('commerce_checkout_column'),
+    );
+    foreach ($column as $key) {
+      $form['columns'][$i_column][$key] = $form[$key];
+      unset($form[$key]);
+    }
+  }
+
+  return $form;
+}

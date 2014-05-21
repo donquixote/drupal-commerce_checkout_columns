@@ -1,0 +1,23 @@
+
+.commerce-checkout-columns {
+  margin:0 -10px;
+}
+
+.commerce-checkout-columns > .commerce-checkout-column {
+  float:left;
+  box-sizing:border-box;
+  padding:0 10px;
+}
+
+.commerce-checkout-columns-2 > .commerce-checkout-column {
+  width:50%;
+}
+
+.commerce-checkout-columns-3 > .commerce-checkout-column {
+  width:31.5%;
+}
+
+.commerce-checkout-column > div {
+  /* give a context to nested elements with width:100% */
+  position:relative;
+}
